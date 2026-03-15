@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<title>OyeComoVa</title>
+<style>
+/* ── Reset & base ─────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:      #080810;
+  --card:    #0f0f1a;
+  --card2:   #161622;
+  --border:  rgba(255,255,255,0.06);
+  --border2: rgba(255,255,255,0.10);
+  --lime:    #c8f135;
+  --lime2:   #d6f545;
+  --muted:   rgba(240,240,250,0.4);
+  --text:    #f0f0fa;
+  --teal:    #4ecdc4;
+  --red:     #ff5e5e;
+  --amber:   #ffb347;
+  --purple:  #a78bfa;
+  --r:       14px;
+  --r2:      18px;
+}
+html{width:360px}
+body{
+  width:360px; min-height:520px;
+  background:var(--bg);
+  color:var(--text);
+  font-family:'DM Sans',sans-serif;
+  font-size:13px;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── Scrollbar ─────────────────────────────── */
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px}
+
+/* ── Nav ────────────────────────────────────── */
+#nav{
+  display:flex;
+  background:var(--card);
+  border-bottom:1px solid var(--border);
+  position:sticky; top:0; z-index:10;
+}
+.nav-btn{
+  flex:1; padding:11px 4px 9px;
+  background:none; border:none; border-bottom:2px solid transparent;
+  margin-bottom:-1px;
+  color:var(--muted); font-family:'DM Sans',sans-serif;
+  font-size:10px; font-weight:500; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+  transition:color .2s;
+}
+.nav-btn svg{width:16px;height:16px;stroke-width:1.8}
+.nav-btn:hover{color:var(--text)}
+.nav-btn.on{color:var(--lime);border-bottom-color:var(--lime)}
+
+/* ── Views ─────────────────────────────────── */
+.view{display:none;flex-direction:column}
+.view.on{display:flex}
+
+/* ── Header ────────────────────────────────── */
+#hdr{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 16px 12px;
+  border-bottom:1px solid var(--border);
+}
+.logo{display:flex;align-items:center;gap:9px}
+.logo-mark{
+  width:28px;height:28px;
+  background:var(--lime);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;
+}
+.logo-name{
+  font-family:'Syne',sans-serif;
+  font-size:15px;font-weight:800;
+  letter-spacing:-.02em;
+}
+.status-chip{
+  font-size:10px;font-weight:600;
+  padding:3px 10px;border-radius:20px;
+  background:rgba(200,241,53,.1);color:var(--lime);
+  border:1px solid rgba(200,241,53,.2);
+  transition:all .3s;
+}
+.status-chip.warn{background:rgba(255,179,71,.1);color:var(--amber);border-color:rgba(255,179,71,.2)}
+.status-chip.danger{background:rgba(255,94,94,.1);color:var(--red);border-color:rgba(255,94,94,.2)}
+
+/* ── Session hero ──────────────────────────── */
+#session-hero{
+  margin:14px 14px 0;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--r2);
+  padding:16px;
+  position:relative; overflow:hidden;
+  transition:border-color .3s;
+}
+#session-hero::before{
+  content:'';position:absolute;
+  top:0;left:0;right:0;height:2px;
+  background:var(--lime);
+  transition:background .3s;
+  border-radius:2px 2px 0 0;
+}
+#session-hero.warn::before{background:var(--amber)}
+#session-hero.danger::before{background:var(--red)}
+#session-hero.warn{border-color:rgba(255,179,71,.15)}
+#session-hero.danger{border-color:rgba(255,94,94,.15)}
+
+.plat-row{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.plat-ico{
+  width:34px;height:34px;
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:10px;display:flex;align-items:center;justify-content:center;
+  font-size:17px;flex-shrink:0;
+}
+.plat-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700}
+.plat-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.dot{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--lime);
+  box-shadow:0 0 8px var(--lime);
+  animation:pulse 2s infinite;
+  opacity:0;transition:opacity .3s;
+}
+.dot.on{opacity:1}
+.dot.warn{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.dot.danger{background:var(--red);box-shadow:0 0 8px var(--red)}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.75);opacity:.6}}
+
+.timer-row{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px}
+.timer-val{
+  font-family:'Syne',sans-serif;
+  font-size:42px;font-weight:800;line-height:1;
+  letter-spacing:-.03em;transition:color .3s;
+}
+.timer-unit{font-size:13px;color:var(--muted);margin-left:4px;font-weight:300}
+.timer-limit{font-size:11px;color:var(--muted);text-align:right}
+.timer-limit b{color:var(--lime);font-weight:600;transition:color .3s}
+
+/* Progress */
+.prog-track{height:3px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden}
+.prog-fill{
+  height:100%;background:var(--lime);
+  border-radius:2px;width:0;
+  transition:width .6s ease, background .3s;
+}
+.prog-fill.warn{background:var(--amber)}
+.prog-fill.danger{background:var(--red)}
+
+/* ── Stats row ─────────────────────────────── */
+.stats-row{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:8px;margin:10px 14px 0;
+}
+.stat-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r);padding:11px 10px 9px;
+}
+.stat-icon{font-size:14px;margin-bottom:4px}
+.stat-val{
+  font-family:'Syne',sans-serif;
+  font-size:17px;font-weight:800;
+  color:var(--lime);letter-spacing:-.02em;
+}
+.stat-lbl{font-size:10px;color:var(--muted);margin-top:1px}
+
+/* ── Streak ────────────────────────────────── */
+#streak-card{
+  margin:10px 14px 0;
+  background:linear-gradient(135deg,rgba(200,241,53,.06) 0%,rgba(167,139,250,.06) 100%);
+  border:1px solid rgba(200,241,53,.12);
+  border-radius:var(--r2);padding:13px 14px;
+  display:flex;align-items:center;gap:11px;
+}
+.streak-fire{
+  font-size:28px;
+  animation:fire 1.4s ease-in-out infinite alternate;
+}
+@keyframes fire{from{transform:scale(1) rotate(-4deg)}to{transform:scale(1.1) rotate(4deg)}}
+.streak-info{flex:1}
+.streak-days{
+  font-family:'Syne',sans-serif;
+  font-size:17px;font-weight:800;color:var(--lime);
+}
+.streak-sub{font-size:10px;color:var(--muted);margin-top:1px}
+.shield-pill{
+  display:flex;align-items:center;gap:5px;
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--border);border-radius:9px;
+  padding:5px 9px;font-size:11px;color:var(--muted);
+  cursor:default;
+  position:relative;
+}
+
+/* ── CTA buttons ───────────────────────────── */
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 14px 14px}
+.btn{
+  padding:10px 14px;border-radius:var(--r);
+  border:1px solid var(--border);background:var(--card2);
+  color:var(--text);font-family:'DM Sans',sans-serif;
+  font-size:12px;font-weight:500;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  transition:all .15s;
+}
+.btn:hover{background:rgba(255,255,255,.07);border-color:var(--border2);transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn-primary{
+  background:var(--lime)!important;color:#080810!important;
+  border-color:var(--lime)!important;font-weight:700!important;
+  box-shadow:0 4px 16px rgba(200,241,53,.2);
+}
+.btn-primary:hover{background:var(--lime2)!important;box-shadow:0 6px 24px rgba(200,241,53,.3);}
+.btn:disabled{opacity:.3;pointer-events:none}
+
+/* ── STATS VIEW ────────────────────────────── */
+.view-pad{padding:14px}
+.sec-title{
+  font-size:10px;font-weight:600;color:var(--muted);
+  letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;
+}
+.chart-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r2);padding:14px;margin-bottom:12px;
+}
+.bar-wrap{display:flex;align-items:flex-end;gap:5px;height:72px;margin-bottom:4px}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
+.bar{
+  width:100%;border-radius:3px 3px 0 0;
+  background:rgba(200,241,53,.18);min-height:3px;
+  transition:height .6s cubic-bezier(.34,1.56,.64,1);cursor:default;
+}
+.bar.today{background:var(--lime)}
+.bar:hover{opacity:.75}
+.bar-d{font-size:9px;color:var(--muted)}
+.bar-d.today{color:var(--lime);font-weight:700}
+.chart-foot{font-size:11px;color:var(--muted);text-align:right}
+.chart-foot b{color:var(--text)}
+
+.plat-list{display:flex;flex-direction:column;gap:9px}
+.plat-item{display:flex;align-items:center;gap:9px}
+.plat-item-ico{
+  width:28px;height:28px;background:var(--bg);
+  border:1px solid var(--border);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;flex-shrink:0;
+}
+.plat-item-info{flex:1;min-width:0}
+.plat-item-name{font-size:12px;font-weight:500}
+.plat-item-time{font-size:10px;color:var(--muted)}
+.plat-track{height:2px;background:rgba(255,255,255,.05);border-radius:1px;margin-top:3px;overflow:hidden}
+.plat-fill{height:100%;border-radius:1px;background:var(--purple);transition:width .6s ease}
+.plat-pct{
+  font-family:'Syne',sans-serif;font-size:11px;
+  font-weight:700;color:var(--muted);min-width:26px;text-align:right;
+}
+
+/* ── LOGROS VIEW ───────────────────────────── */
+.xp-hero{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r2);padding:14px;margin-bottom:12px;
+}
+.xp-top{display:flex;align-items:center;gap:11px;margin-bottom:11px}
+.xp-lvl-badge{
+  width:34px;height:34px;border-radius:10px;
+  background:linear-gradient(135deg,#7c3aed,#a78bfa);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Syne',sans-serif;font-size:14px;font-weight:800;
+  flex-shrink:0;
+}
+.xp-lvl-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700}
+.xp-lvl-sub{font-size:10px;color:var(--muted);margin-top:1px}
+.xp-total{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:var(--lime);margin-left:auto}
+.xp-track{height:5px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden}
+.xp-fill{
+  height:100%;border-radius:3px;
+  background:linear-gradient(90deg,#7c3aed,var(--lime));
+  transition:width .8s ease;
+}
+
+.achiev-list{display:flex;flex-direction:column;gap:7px}
+.achiev-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r);padding:11px 12px;
+  display:flex;align-items:center;gap:10px;
+  transition:border-color .2s, transform .2s;
+}
+.achiev-card:hover{border-color:var(--border2);transform:translateX(2px)}
+.achiev-card.locked{opacity:.3;filter:grayscale(1)}
+.achiev-emoji{
+  width:40px;height:40px;
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:11px;display:flex;align-items:center;justify-content:center;
+  font-size:20px;flex-shrink:0;
+}
+.achiev-info{flex:1}
+.achiev-name{font-family:'Syne',sans-serif;font-size:12px;font-weight:700}
+.achiev-desc{font-size:10px;color:var(--muted);margin-top:1px}
+.achiev-xp{
+  font-size:10px;font-weight:700;
+  padding:2px 8px;border-radius:7px;white-space:nowrap;
+}
+.achiev-xp.unlocked{color:var(--lime);background:rgba(200,241,53,.1);border:1px solid rgba(200,241,53,.15)}
+.achiev-xp.locked{color:var(--muted);background:rgba(255,255,255,.04);border:1px solid var(--border)}
+
+/* ── CONFIG VIEW ───────────────────────────── */
+.cfg-list{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.cfg-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r);padding:11px 12px;
+  display:flex;align-items:center;gap:10px;
+}
+.cfg-ico{
+  width:32px;height:32px;background:var(--bg);
+  border:1px solid var(--border);border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;flex-shrink:0;
+}
+.cfg-info{flex:1}
+.cfg-name{font-size:12px;font-weight:500}
+.cfg-sub{font-size:10px;color:var(--muted)}
+.cfg-input{
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:8px;color:var(--text);
+  font-family:'Syne',sans-serif;font-size:12px;font-weight:700;
+  padding:4px 7px;width:54px;text-align:center;outline:none;
+  transition:border-color .2s;
+}
+.cfg-input:focus{border-color:var(--lime)}
+
+/* Toggle */
+.toggle{
+  width:34px;height:19px;border-radius:10px;
+  background:rgba(255,255,255,.08);border:1px solid var(--border);
+  position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;
+}
+.toggle.on{background:var(--lime);border-color:var(--lime)}
+.toggle::after{
+  content:'';position:absolute;
+  width:13px;height:13px;background:white;
+  border-radius:50%;top:2px;left:2px;
+  transition:transform .2s;
+  box-shadow:0 1px 4px rgba(0,0,0,.3);
+}
+.toggle.on::after{transform:translateX(15px)}
+
+/* ── Empty state ───────────────────────────── */
+.empty{font-size:12px;color:var(--muted);text-align:center;padding:20px 0}
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav id="nav">
+  <button class="nav-btn on" data-tab="home">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    Inicio
+  </button>
+  <button class="nav-btn" data-tab="stats">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    Stats
+  </button>
+  <button class="nav-btn" data-tab="logros">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>
+    Logros
+  </button>
+  <button class="nav-btn" data-tab="config">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+    Config
+  </button>
+</nav>
+
+<!-- ══ HOME ══════════════════════════════════ -->
+<div class="view on" id="tab-home">
+
+  <div id="hdr">
+    <div class="logo">
+      <div class="logo-mark"><img src="../icons/icon16.png" alt="logo" style="width: 16px; height: 16px;"></div>
+      <span class="logo-name">OyeComoVa</span>
+    </div>
+    <div class="status-chip" id="status-chip">Activo</div>
+  </div>
+
+  <div id="session-hero">
+    <div class="plat-row">
+      <div class="plat-ico" id="plat-ico"><i class="fa-solid fa-bed" style="color: #a78bfa;"></i></div>
+      <div style="flex:1">
+        <div class="plat-name" id="plat-name">Sin actividad</div>
+        <div class="plat-sub" id="plat-sub">Abre TikTok o Instagram</div>
+      </div>
+      <div class="dot" id="dot"></div>
+    </div>
+    <div class="timer-row">
+      <div>
+        <span class="timer-val" id="timer-val">0</span>
+        <span class="timer-unit">min hoy</span>
+      </div>
+      <div class="timer-limit">Límite: <b id="timer-limit">—</b></div>
+    </div>
+    <div class="prog-track">
+      <div class="prog-fill" id="prog-fill"></div>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="fa-solid fa-stopwatch"></i></div>
+      <div class="stat-val" id="s-total">0m</div>
+      <div class="stat-lbl">Total hoy</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon"><i class="fa-solid fa-fire"></i></div>
+      <div class="stat-val" id="s-streak">0</div>
+      <div class="stat-lbl">Racha</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon"><i class="fa-solid fa-bolt"></i></div>
+      <div class="stat-val" id="s-xp">0</div>
+      <div class="stat-lbl">XP total</div>
+    </div>
+  </div>
+
+  <div id="streak-card">
+    <span class="streak-fire"><i class="fa-solid fa-fire" style="color: #ff5e5e;"></i></span>
+    <div class="streak-info">
+      <div class="streak-days" id="streak-days">0 días</div>
+      <div class="streak-sub" id="streak-sub">Empieza tu racha hoy</div>
+    </div>
+    <div class="shield-pill">
+      <i class="fa-solid fa-shield"></i> <span id="shield-n">1</span>
+    </div>
+  </div>
+
+  <div class="btns">
+    <button class="btn" id="btn-pause" disabled><i class="fa-solid fa-pause"></i> Pausar</button>
+    <button class="btn btn-primary" id="btn-dash">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Dashboard
+    </button>
+  </div>
+
+</div>
+
+<!-- ══ STATS ══════════════════════════════════ -->
+<div class="view" id="tab-stats">
+  <div class="view-pad">
+    <p class="sec-title">Esta semana</p>
+    <div class="chart-card">
+      <div class="bar-wrap" id="bar-chart"></div>
+      <div class="chart-foot">Total: <b id="week-total">0 min</b></div>
+    </div>
+    <p class="sec-title">Por plataforma hoy</p>
+    <div class="plat-list" id="plat-list"></div>
+  </div>
+</div>
+
+<!-- ══ LOGROS ══════════════════════════════════ -->
+<div class="view" id="tab-logros">
+  <div class="view-pad">
+    <div class="xp-hero">
+      <div class="xp-top">
+        <div class="xp-lvl-badge" id="xp-lvl">1</div>
+        <div>
+          <div class="xp-lvl-name" id="xp-name">Iniciando</div>
+          <div class="xp-lvl-sub" id="xp-sub">Nivel 1 · 0 XP</div>
+        </div>
+        <div class="xp-total" id="xp-total">0 XP</div>
+      </div>
+      <div class="xp-track">
+        <div class="xp-fill" id="xp-fill" style="width:0%"></div>
+      </div>
+    </div>
+    <p class="sec-title">Logros</p>
+    <div class="achiev-list" id="achiev-list"></div>
+  </div>
+</div>
+
+<!-- ══ CONFIG ══════════════════════════════════ -->
+<div class="view" id="tab-config">
+  <div class="view-pad">
+    <p class="sec-title">Límites por plataforma</p>
+    <div class="cfg-list" id="cfg-list"></div>
+    <p class="sec-title">Intervenciones</p>
+    <div class="cfg-list">
+      <div class="cfg-card">
+        <div class="cfg-ico"><i class="fa-solid fa-bell"></i></div>
+        <div class="cfg-info">
+          <div class="cfg-name">Alerta suave (50%)</div>
+          <div class="cfg-sub">Notificación de Chrome</div>
+        </div>
+        <div class="toggle on" id="tog-soft"></div>
+      </div>
+      <div class="cfg-card">
+        <div class="cfg-ico"><i class="fa-solid fa-cloud"></i></div>
+        <div class="cfg-info">
+          <div class="cfg-name">Overlay (75%–100%)</div>
+          <div class="cfg-sub">Pantalla de intervención</div>
+        </div>
+        <div class="toggle on" id="tog-overlay"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>
