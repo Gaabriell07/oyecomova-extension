@@ -16,8 +16,6 @@ Al no estar publicada aún en la Chrome Web Store, necesitas cargarla manualment
 6. Se abrirá una ventana para elegir una carpeta. **Selecciona la carpeta raíz de este proyecto** (`ocv-final` o donde la hayas guardado).
 7. ¡Listo! Verás la tarjeta de OyeComoVa.
 
-> _Tip: Te recomendamos hacer clic en el ícono del rompecabezas 🧩 en la esquina superior derecha de tu navegador y fijar (📌) la extensión para tenerla siempre a la vista._
-
 ## ¿Cómo funciona?
 
 - Entra a una red social (ej. `tiktok.com`) y verás cómo el contador de la extensión empieza a sumar minutos automáticamente.
