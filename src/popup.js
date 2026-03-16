@@ -54,17 +54,25 @@ async function getWeekly() {
   })
 }
 
+// ── Nav helper ────────────────────────────────
+
+function goToTab(tabName) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('on'))
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('on'))
+  document.querySelector(`[data-tab="${tabName}"]`)?.classList.add('on')
+  document.getElementById('tab-'+tabName)?.classList.add('on')
+}
+
 // ── Render home ───────────────────────────────
 
 async function renderHome() {
-  // Get status from service worker (with timeout fallback)
   const session = await Promise.race([
     chrome.runtime.sendMessage({type:'GET_STATUS'}).then(r=>r?.session).catch(()=>null),
     new Promise(res=>setTimeout(()=>res(null),800))
   ])
 
-  const [stats, config, streak, xp] = await Promise.all([
-    getStats(), getConfig(), getStreak(), getXP()
+  const [stats, config, streak, xp, token] = await Promise.all([
+    getStats(), getConfig(), getStreak(), getXP(), g('auth_token')
   ])
 
   const totalToday = Object.values(stats).reduce((a,b)=>a+b,0)
@@ -76,6 +84,14 @@ async function renderHome() {
   document.getElementById('streak-days').textContent = `${streak.count} día${streak.count!==1?'s':''}`
   document.getElementById('streak-sub').textContent = streak.count===0 ? 'Empieza tu racha hoy' : streak.count<7 ? '¡Sigue así!' : '¡Imparable! 🔥'
   document.getElementById('shield-n').textContent = streak.shieldCount
+
+  // Botón dashboard cambia según auth
+  const btnDash = document.getElementById('btn-dash')
+  if (!token) {
+    btnDash.innerHTML = '<i class="fa-solid fa-user" style="font-size:11px"></i> Conectar'
+  } else {
+    btnDash.innerHTML = '<i class="fa-solid fa-chart-bar" style="font-size:11px"></i> Dashboard'
+  }
 
   const hero  = document.getElementById('session-hero')
   const chip  = document.getElementById('status-chip')
@@ -91,7 +107,7 @@ async function renderHome() {
     const ratio = Math.min(mins/limit, 1)
     const pct   = Math.round(ratio*100)
 
-    document.getElementById('plat-ico').textContent = p?.emoji || '📱'
+    document.getElementById('plat-ico').innerHTML = p?.emoji || '📱'
     document.getElementById('plat-name').textContent = p?.name || session.name
     document.getElementById('plat-sub').textContent = 'Sesión activa ahora'
     document.getElementById('timer-val').textContent = mins
@@ -100,7 +116,7 @@ async function renderHome() {
     dot.className = `dot on${ratio>=1?' danger':ratio>=.75?' warn':''}`
     fill.style.width = pct+'%'
     fill.className = `prog-fill${ratio>=1?' danger':ratio>=.75?' warn':''}`
-    hero.className = `${ratio>=1?'danger':ratio>=.75?'warn':''}`
+    hero.className = ratio>=1?'danger':ratio>=.75?'warn':''
 
     if (ratio>=1) {
       chip.textContent='⚠ Límite superado'; chip.className='status-chip danger'
@@ -119,7 +135,7 @@ async function renderHome() {
     document.getElementById('plat-name').textContent = 'Sin actividad'
     document.getElementById('plat-sub').textContent = 'Abre TikTok o Instagram'
     document.getElementById('timer-val').textContent = Math.round(totalToday)
-    document.getElementById('timer-limit').textContent = totalLimit > 0 ? `${totalLimit} min` : '—'
+    document.getElementById('timer-limit').textContent = '—'
     fill.style.width = '0%'
     dot.className = 'dot'
     hero.className = ''
@@ -155,11 +171,9 @@ async function renderStats() {
   const list  = document.getElementById('plat-list')
   list.innerHTML = ''
   const sorted = Object.entries(stats).sort((a,b)=>b[1]-a[1]).filter(([,m])=>m>=0.5)
-
   if (!sorted.length) { list.innerHTML = '<div class="empty">Sin datos de hoy todavía</div>'; return }
-
   sorted.forEach(([pid, mins]) => {
-    const p   = PLATFORMS[pid]; if(!p) return
+    const p = PLATFORMS[pid]; if(!p) return
     const pct = Math.round((mins/total)*100)
     const row = document.createElement('div')
     row.className = 'plat-item'
@@ -180,13 +194,11 @@ async function renderStats() {
 
 async function renderLogros() {
   const [xp, unlocked] = await Promise.all([getXP(), (g('achievements').then(r=>r||{}))])
-
   document.getElementById('xp-lvl').textContent   = xp.level
   document.getElementById('xp-name').textContent  = xp.name
   document.getElementById('xp-sub').textContent   = `Nivel ${xp.level} · ${xp.total} XP`
   document.getElementById('xp-total').textContent = `${xp.total} XP`
   document.getElementById('xp-fill').style.width  = `${xp.progress}%`
-
   const sorted = [...ACHIEVEMENTS].sort((a,b)=>!!unlocked[b.id]-!!unlocked[a.id])
   const list = document.getElementById('achiev-list')
   list.innerHTML = ''
@@ -212,7 +224,6 @@ async function renderConfig() {
   const config = await getConfig()
   const list   = document.getElementById('cfg-list')
   list.innerHTML = ''
-
   Object.values(PLATFORMS).forEach(p => {
     const cfg = config[p.id]||{}
     const div = document.createElement('div')
@@ -229,31 +240,128 @@ async function renderConfig() {
     `
     list.appendChild(div)
   })
-
-  // Input change
   list.querySelectorAll('.cfg-input').forEach(inp => {
     let t; inp.addEventListener('input', () => {
       clearTimeout(t)
       t = setTimeout(async () => {
         const v = parseInt(inp.value)
-        if (v>0) {
-          await chrome.runtime.sendMessage({type:'SAVE_CONFIG', platformId:inp.dataset.pid, updates:{limit:v}})
-        }
+        if (v>0) await chrome.runtime.sendMessage({type:'SAVE_CONFIG', platformId:inp.dataset.pid, updates:{limit:v}})
       }, 600)
     })
   })
-
-  // Toggle
   list.querySelectorAll('.toggle').forEach(tog => {
     tog.addEventListener('click', async () => {
       tog.classList.toggle('on')
-      const enabled = tog.classList.contains('on')
-      await chrome.runtime.sendMessage({type:'SAVE_CONFIG', platformId:tog.dataset.pid, updates:{enabled}})
+      await chrome.runtime.sendMessage({type:'SAVE_CONFIG', platformId:tog.dataset.pid, updates:{enabled:tog.classList.contains('on')}})
     })
   })
-
   document.getElementById('tog-soft').addEventListener('click', function(){this.classList.toggle('on')})
   document.getElementById('tog-overlay').addEventListener('click', function(){this.classList.toggle('on')})
+}
+
+// ── Render cuenta ─────────────────────────────
+
+async function renderCuenta() {
+  const [token, user] = await Promise.all([g('auth_token'), g('auth_user')])
+  const view = document.getElementById('tab-cuenta')
+  if (!view) return
+
+  if (token && user) {
+    view.innerHTML = `
+      <div style="padding:20px 16px;display:flex;flex-direction:column;gap:12px">
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:16px;display:flex;align-items:center;gap:12px">
+          <div style="width:42px;height:42px;background:var(--lime);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;color:#080810;font-size:17px;flex-shrink:0">
+            ${(user.name||user.email||'U')[0].toUpperCase()}
+          </div>
+          <div>
+            <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700">${user.name||'Usuario'}</div>
+            <div style="font-size:11px;color:var(--muted)">${user.email}</div>
+          </div>
+        </div>
+        <div style="background:rgba(200,241,53,.06);border:1px solid rgba(200,241,53,.12);border-radius:var(--r);padding:12px 14px;font-size:12px;color:var(--muted)">
+          ✅ Tus datos se sincronizan con el servidor
+        </div>
+        <button id="btn-open-dash" style="width:100%;padding:11px;border-radius:var(--r);background:var(--lime);color:#080810;border:none;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer">
+          Abrir Dashboard →
+        </button>
+        <button id="btn-logout" style="width:100%;padding:10px;border-radius:var(--r);background:transparent;color:var(--muted);border:1px solid var(--border);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer">
+          Cerrar sesión
+        </button>
+      </div>
+    `
+    document.getElementById('btn-open-dash').onclick = async () => {
+      const t = await g('auth_token')
+      chrome.tabs.create({ url: `http://localhost:5173?token=${t}` })
+    }
+    document.getElementById('btn-logout').onclick = async () => {
+      await chrome.runtime.sendMessage({ type: 'LOGOUT' })
+      renderCuenta()
+      renderHome()
+    }
+  } else {
+    view.innerHTML = `
+      <div style="padding:20px 16px;display:flex;flex-direction:column;gap:10px">
+        <div style="text-align:center;padding:12px 0 6px">
+          <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800;margin-bottom:6px">Conecta tu cuenta</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.5">Sincroniza tus datos y accede al dashboard</div>
+        </div>
+        <div id="auth-error" style="display:none;background:rgba(255,94,94,.1);border:1px solid rgba(255,94,94,.2);border-radius:var(--r);padding:10px 12px;font-size:11px;color:var(--red)"></div>
+        <div style="display:flex;background:var(--card);border-radius:var(--r);padding:3px;gap:2px">
+          <button class="auth-tab" data-form="login" style="flex:1;padding:7px;border:none;border-radius:10px;background:var(--card2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;cursor:pointer">Iniciar sesión</button>
+          <button class="auth-tab" data-form="register" style="flex:1;padding:7px;border:none;border-radius:10px;background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">Registrarse</button>
+        </div>
+        <div id="form-login" style="display:flex;flex-direction:column;gap:8px">
+          <input id="login-email" type="email" placeholder="Email" style="width:100%;padding:10px 12px;border-radius:var(--r);background:var(--card);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none"/>
+          <input id="login-pass" type="password" placeholder="Contraseña" style="width:100%;padding:10px 12px;border-radius:var(--r);background:var(--card);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none"/>
+          <button id="btn-login" style="width:100%;padding:11px;border-radius:var(--r);background:var(--lime);color:#080810;border:none;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer">Entrar</button>
+        </div>
+        <div id="form-register" style="display:none;flex-direction:column;gap:8px">
+          <input id="reg-name" type="text" placeholder="Nombre" style="width:100%;padding:10px 12px;border-radius:var(--r);background:var(--card);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none"/>
+          <input id="reg-email" type="email" placeholder="Email" style="width:100%;padding:10px 12px;border-radius:var(--r);background:var(--card);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none"/>
+          <input id="reg-pass" type="password" placeholder="Contraseña" style="width:100%;padding:10px 12px;border-radius:var(--r);background:var(--card);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none"/>
+          <button id="btn-register" style="width:100%;padding:11px;border-radius:var(--r);background:var(--lime);color:#080810;border:none;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer">Crear cuenta</button>
+        </div>
+      </div>
+    `
+    view.querySelectorAll('.auth-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        view.querySelectorAll('.auth-tab').forEach(t => {
+          t.style.background = 'transparent'; t.style.color = 'var(--muted)'; t.style.fontWeight = '400'
+        })
+        tab.style.background = 'var(--card2)'; tab.style.color = 'var(--text)'; tab.style.fontWeight = '600'
+        document.getElementById('form-login').style.display    = tab.dataset.form==='login'    ? 'flex' : 'none'
+        document.getElementById('form-register').style.display = tab.dataset.form==='register' ? 'flex' : 'none'
+      })
+    })
+
+    function showError(msg) {
+      const el = document.getElementById('auth-error')
+      el.textContent = msg; el.style.display = 'block'
+    }
+
+    document.getElementById('btn-login').onclick = async () => {
+      const email = document.getElementById('login-email').value.trim()
+      const password = document.getElementById('login-pass').value
+      if (!email || !password) return showError('Completa todos los campos')
+      const btn = document.getElementById('btn-login')
+      btn.textContent = 'Entrando...'; btn.disabled = true
+      const res = await chrome.runtime.sendMessage({ type:'LOGIN', email, password })
+      if (res.ok) { renderCuenta(); renderHome() }
+      else { showError(res.error||'Credenciales incorrectas'); btn.textContent='Entrar'; btn.disabled=false }
+    }
+
+    document.getElementById('btn-register').onclick = async () => {
+      const name = document.getElementById('reg-name').value.trim()
+      const email = document.getElementById('reg-email').value.trim()
+      const password = document.getElementById('reg-pass').value
+      if (!email || !password) return showError('Email y contraseña son requeridos')
+      const btn = document.getElementById('btn-register')
+      btn.textContent = 'Creando...'; btn.disabled = true
+      const res = await chrome.runtime.sendMessage({ type:'REGISTER', email, password, name })
+      if (res.ok) { renderCuenta(); renderHome() }
+      else { showError(res.error||'Error al registrarse'); btn.textContent='Crear cuenta'; btn.disabled=false }
+    }
+  }
 }
 
 // ── Navigation ────────────────────────────────
@@ -261,10 +369,8 @@ async function renderConfig() {
 document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const tab = btn.dataset.tab
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('on'))
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('on'))
-    btn.classList.add('on')
-    document.getElementById('tab-'+tab).classList.add('on')
+    goToTab(tab)
+    if (tab === 'cuenta') renderCuenta()
   })
 })
 
@@ -275,8 +381,14 @@ document.getElementById('btn-pause').addEventListener('click', async () => {
   await renderHome()
 })
 
-document.getElementById('btn-dash').addEventListener('click', () => {
-  chrome.tabs.create({url:'https://oyecomova.app'})
+document.getElementById('btn-dash').addEventListener('click', async () => {
+  const token = await g('auth_token')
+  if (token) {
+    chrome.tabs.create({ url: `http://localhost:5173?token=${token}` })
+  } else {
+    goToTab('cuenta')
+    renderCuenta()
+  }
 })
 
 // ── Init ──────────────────────────────────────

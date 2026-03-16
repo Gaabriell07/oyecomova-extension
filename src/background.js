@@ -28,6 +28,71 @@ const ACTS = [
 
 const today = () => new Date().toISOString().slice(0,10)
 
+const API_URL = 'http://localhost:3000'
+
+async function syncSession(pid, mins) {
+  const token = await g('auth_token')
+  if (!token) return
+  fetch(`${API_URL}/sessions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({ platform: pid, minutes: mins, date: today() })
+  }).catch(() => {})
+}
+
+async function syncAchievement(achievementId) {
+  const token = await g('auth_token')
+  if (!token) return
+  fetch(`${API_URL}/users/achievements`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ achievementId })
+  }).catch(() => {})
+}
+
+async function checkAchievements(pid, minsToday, limit) {
+  const achiev = (await g('achievements')) || {}
+  const streak = (await g('streak')) || {count: 0}
+  let updated = false
+
+  if (!achiev.first_day && minsToday > 0 && minsToday <= limit) {
+    achiev.first_day = {unlockedAt: new Date().toISOString()}
+    await addXP(100)
+    await syncAchievement('first_day')
+    updated = true
+    console.log('[OCV] <i class="fa-solid fa-trophy"></i> Logro desbloqueado: first_day')
+  }
+
+  if (!achiev.streak_3 && streak.count >= 3) {
+    achiev.streak_3 = {unlockedAt: new Date().toISOString()}
+    await addXP(75)
+    await syncAchievement('streak_3')
+    updated = true
+    console.log('[OCV] <i class="fa-solid fa-trophy"></i> Logro desbloqueado: streak_3')
+  }
+
+  if (!achiev.streak_7 && streak.count >= 7) {
+    achiev.streak_7 = {unlockedAt: new Date().toISOString()}
+    await addXP(150)
+    await syncAchievement('streak_7')
+    updated = true
+    console.log('[OCV] <i class="fa-solid fa-trophy"></i> Logro desbloqueado: streak_7')
+  }
+
+  if (!achiev.streak_30 && streak.count >= 30) {
+    achiev.streak_30 = {unlockedAt: new Date().toISOString()}
+    await addXP(500)
+    await syncAchievement('streak_30')
+    updated = true
+    console.log('[OCV] <i class="fa-solid fa-trophy"></i> Logro desbloqueado: streak_30')
+  }
+
+  if (updated) await s('achievements', achiev)
+}
+
 async function g(key) {
   const r = await chrome.storage.local.get(key)
   return r[key]
@@ -88,7 +153,9 @@ async function startSession(tabId, platform) {
   // Si hay sesión previa, guardar su tiempo antes de reemplazar
   const existing = await g('session')
   if (existing) {
-    const mins = (Date.now() - existing.lastSaved) / 60000
+    const startOfToday = new Date(); startOfToday.setHours(0,0,0,0)
+    const lastSaved = Math.max(existing.lastSaved, startOfToday.getTime())
+    const mins = (Date.now() - lastSaved) / 60000
     if (mins > 0.01) {
       await addMins(existing.pid, mins)
       console.log('[OCV] 💾', existing.name, '+' + Math.round(mins*100)/100 + ' min guardados')
@@ -111,8 +178,14 @@ async function startSession(tabId, platform) {
 async function endSession() {
   const sess = await g('session')
   if (!sess) return
-  const mins = (Date.now() - sess.lastSaved) / 60000
-  if (mins > 0.01) await addMins(sess.pid, mins)
+  // Solo contar tiempo del día actual
+  const startOfToday = new Date(); startOfToday.setHours(0,0,0,0)
+  const lastSaved = Math.max(sess.lastSaved, startOfToday.getTime())
+  const mins = (Date.now() - lastSaved) / 60000
+  if (mins > 0.01) {
+    await addMins(sess.pid, mins)
+    syncSession(sess.pid, mins)
+  }
   await chrome.storage.local.remove('session')
   console.log('[OCV] ⏹', sess.name, Math.round(mins*100)/100, 'min')
 }
@@ -123,12 +196,15 @@ async function tick() {
   const sess = await g('session')
   if (!sess) return
 
-  // Calcular tiempo real desde el último guardado
-  const now  = Date.now()
-  const mins = (now - sess.lastSaved) / 60000
+  const now = Date.now()
+  const startOfToday = new Date(); startOfToday.setHours(0,0,0,0)
+  // Solo contar desde inicio del día si lastSaved es de ayer
+  const lastSaved = Math.max(sess.lastSaved, startOfToday.getTime())
+  const mins = (now - lastSaved) / 60000
 
   if (mins > 0) {
     await addMins(sess.pid, mins)
+    syncSession(sess.pid, mins) 
   }
 
   // Actualizar lastSaved para que el siguiente tick no cuente doble
@@ -171,27 +247,21 @@ async function tick() {
       message:`${Math.round(minsToday)} min en ${sess.name}. Límite: ${cfg.limit} min.`
     })
   } else {
-    // Attempt to find the active tab in the current window first, as this is the most reliable
-    // place to show the overlay. Fallback to sess.tabId if we can't find one.
-    let targetTabId = sess.tabId
-    const [activeTab] = await chrome.tabs.query({active:true, currentWindow:true})
-    if (activeTab && activeTab.url && activeTab.url.includes(sess.name.toLowerCase().replace(' ', ''))) {
-       targetTabId = activeTab.id
-    } else if (activeTab) {
-       targetTabId = activeTab.id // Just send it to the active tab anyway if we can't be sure
-    }
-
-    if (targetTabId) {
-      chrome.tabs.sendMessage(targetTabId, {
-        type:'SHOW_OVERLAY', level,
-        platform:     sess.name,
-        minutesToday: Math.round(minsToday),
-        limit:        cfg.limit,
-        message:      msg,
-        activity:     act,
-      }).catch((e)=>{ console.log('[OCV] Error sending overlay to tab', e) })
-    }
+  const [activeTab] = await chrome.tabs.query({active:true, currentWindow:true})
+  const targetTabId = activeTab?.id || sess.tabId
+  if (targetTabId) {
+    chrome.tabs.sendMessage(targetTabId, {
+      type:'SHOW_OVERLAY', level,
+      platform:     sess.name,
+      minutesToday: Math.round(minsToday),
+      limit:        cfg.limit,
+      message:      msg,
+      activity:     act,
+    }).catch((e)=>{ console.log('[OCV] Error sending overlay to tab', e) })
   }
+  }
+
+  await checkAchievements(sess.pid, minsToday, cfg.limit)
 }
 
 // ── Messages ──────────────────────────────────
@@ -219,6 +289,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
           achiev.first_pause = {unlockedAt: new Date().toISOString()}
           await s('achievements', achiev)
           await addXP(50)
+          syncAchievement('first_pause')
         }
         if (!sender || !sender.tab) {
           if (sess && sess.tabId) {
@@ -253,6 +324,62 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
         config[msg.platformId] = {...config[msg.platformId], ...msg.updates}
         await s('config', config)
         reply({ok:true})
+        break
+      }
+            case 'LOGIN': {
+        try {
+          const res = await fetch(`${API_URL}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: msg.email, password: msg.password })
+          })
+          const data = await res.json()
+          if (data.token) {
+            await s('auth_token', data.token)
+            await s('auth_user', data.user)
+            // Sincronizar logros locales al backend
+            const localAchiev = (await g('achievements')) || {}
+            for (const achievementId of Object.keys(localAchiev)) {
+              fetch(`${API_URL}/users/achievements`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${data.token}` },
+                body: JSON.stringify({ achievementId })
+              }).catch(() => {})
+            }
+            reply({ ok: true, user: data.user })
+          } else {
+            reply({ ok: false, error: data.message })
+          }
+        } catch { reply({ ok: false, error: 'Sin conexión' }) }
+        break
+      }
+      case 'REGISTER': {
+        try {
+          const res = await fetch(`${API_URL}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: msg.email, password: msg.password, name: msg.name })
+          })
+          const data = await res.json()
+          if (data.token) {
+            await s('auth_token', data.token)
+            await s('auth_user', data.user)
+            reply({ ok: true, user: data.user })
+          } else {
+            reply({ ok: false, error: data.message })
+          }
+        } catch { reply({ ok: false, error: 'Sin conexión' }) }
+        break
+      }
+      case 'LOGOUT': {
+        await chrome.storage.local.remove(['auth_token', 'auth_user'])
+        reply({ ok: true })
+        break
+      }
+      case 'GET_AUTH': {
+        const token = await g('auth_token')
+        const user  = await g('auth_user')
+        reply({ token: token || null, user: user || null })
         break
       }
     }
